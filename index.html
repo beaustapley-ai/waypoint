@@ -202,18 +202,6 @@
   .row--unlinked .row-go { color: var(--marker); }
   .empty { padding: 28px 22px; color: var(--muted); font-size: 14px; }
 
-  /* ── Unlock ──────────────────────────────── */
-  .unlock { padding: 26px 22px; display: grid; gap: 12px; }
-  .unlock h2 {
-    font-family: Newsreader, Georgia, serif;
-    font-weight: 400;
-    font-size: 22px;
-    margin: 0;
-  }
-  .unlock p { margin: 0; color: var(--muted); font-size: 13.5px; }
-  .unlock form { display: flex; gap: 8px; }
-  .unlock input { flex: 1; }
-
   /* ── Edit mode ───────────────────────────── */
   .edit {
     display: grid;
@@ -305,19 +293,6 @@
     margin: 0;
   }
   .status--bad { color: var(--danger); }
-  .linkish {
-    font-family: "IBM Plex Mono", ui-monospace, monospace;
-    font-size: 11px;
-    letter-spacing: .06em;
-    color: var(--muted);
-    background: none;
-    border: 0;
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .linkish:hover { color: var(--accent); }
-  .linkish[hidden] { display: none; }
 
   @media (max-width: 560px) {
     .wrap { padding-block: 32px 48px; }
@@ -328,7 +303,6 @@
     .edit .tools { grid-row: 1 / 3; grid-column: 2; }
     .edit-fields { grid-column: 1 / 2; }
     .field-pair { grid-template-columns: 1fr; }
-    .unlock form { flex-direction: column; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -357,18 +331,20 @@
 
   <div class="footer">
     <p class="status" id="status"></p>
-    <button class="linkish" id="forgetBtn" hidden>Forget key on this device</button>
   </div>
 </main>
 
 <script>
   /* ─────────────────────────────────────────────────────────────────────────
-   * CONFIG — paste your Apps Script web-app URL (ends in /exec) here.
-   * It's safe to commit: nothing comes back without the Waypoint key.
+   * CONFIG
+   * API_URL: your Apps Script web-app URL (ends in /exec).
+   * API_KEY: the key createKey() printed. If you ever re-run createKey(),
+   *          paste the new key here.
    * ───────────────────────────────────────────────────────────────────────── */
-  var API_URL = 'PASTE_YOUR_APPS_SCRIPT_EXEC_URL';
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxyA0kHECDad1DrbAAJlrTqOEqP1wxvmg41oF7T2h3l1dFBtT1EWvNiuP5x4S4vzayTTg/exec';
 
-  var LS_KEY = 'waypoint.key';
+  var API_KEY = '89d57cd8bc974360bcbb';
+
   var LS_ITEMS = 'waypoint.items';
 
   var board = document.getElementById('board');
@@ -378,7 +354,6 @@
   var editBtn = document.getElementById('editBtn');
   var saveBtn = document.getElementById('saveBtn');
   var cancelBtn = document.getElementById('cancelBtn');
-  var forgetBtn = document.getElementById('forgetBtn');
   var viewActions = document.getElementById('viewActions');
   var editActions = document.getElementById('editActions');
 
@@ -390,9 +365,7 @@
   // ── Storage (wrapped: private mode / storage-off shouldn't break the page) ──
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
 
-  function getKey() { return lsGet(LS_KEY) || ''; }
   function cacheItems(items) { lsSet(LS_ITEMS, JSON.stringify({ at: Date.now(), items: items })); }
   function cachedItems() {
     try { var c = JSON.parse(lsGet(LS_ITEMS) || 'null'); return c && Array.isArray(c.items) ? c : null; }
@@ -411,11 +384,11 @@
   // ── API ─────────────────────────────────────
   function AuthError(msg) { this.message = msg; this.auth = true; }
 
-  function api(action, extra, keyOverride) {
+  function api(action, extra) {
     if (!/^https:\/\//.test(API_URL)) {
       return Promise.reject(new Error('Set API_URL at the top of index.html to your Apps Script /exec link.'));
     }
-    var body = Object.assign({ action: action, key: keyOverride != null ? keyOverride : getKey() }, extra || {});
+    var body = Object.assign({ action: action, key: API_KEY }, extra || {});
     return fetch(API_URL, {
       method: 'POST',
       // text/plain keeps this a "simple" request, so Apps Script needs no CORS preflight.
@@ -439,10 +412,8 @@
       });
   }
 
-  function handleAuthFail(err) {
-    lsDel(LS_KEY);
-    forgetBtn.hidden = true;
-    showUnlock(err.message);
+  function handleAuthFail() {
+    setStatus('The key in index.html doesn’t match the script — update API_KEY.', true);
   }
 
   // ── View mode ───────────────────────────────
@@ -497,51 +468,6 @@
     tagline.textContent = items.length === 1 ? '1 destination' : items.length + ' destinations';
   }
 
-  function showUnlock(message) {
-    editing = false;
-    viewActions.hidden = true;
-    editActions.hidden = true;
-    board.textContent = '';
-    tagline.textContent = 'Locked on this device';
-
-    var box = mk('div', 'unlock');
-    box.appendChild(mk('h2', '', { textContent: 'Enter your Waypoint key' }));
-    box.appendChild(mk('p', '', { textContent: 'One time per device. It’s the key createKey() printed in the Apps Script log.' }));
-
-    var form = mk('form');
-    var input = mk('input', 'in-mono', { type: 'password', placeholder: 'Waypoint key', autocomplete: 'current-password',
-      ariaLabel: 'Waypoint key', autocapitalize: 'off', spellcheck: false });
-    var btn = mk('button', 'btn btn--primary', { type: 'submit', textContent: 'Unlock' });
-    form.appendChild(input);
-    form.appendChild(btn);
-    form.onsubmit = function (e) {
-      e.preventDefault();
-      var key = input.value.trim();
-      if (!key) return;
-      btn.disabled = true;
-      btn.textContent = 'Checking…';
-      setStatus('');
-      api('list', null, key)
-        .then(function (items) {
-          lsSet(LS_KEY, key);
-          forgetBtn.hidden = false;
-          viewActions.hidden = false;
-          cacheItems(items);
-          render(items);
-          setStatus('Unlocked.');
-        })
-        .catch(function (err) {
-          btn.disabled = false;
-          btn.textContent = 'Unlock';
-          setStatus(err.auth ? 'That key didn’t match.' : 'Couldn’t reach Waypoint: ' + errText(err), true);
-        });
-    };
-    box.appendChild(form);
-    board.appendChild(box);
-    setStatus(message || '', !!message);
-    setTimeout(function () { input.focus(); }, 50);
-  }
-
   function load(action) {
     return api(action).then(function (items) {
       cacheItems(items);
@@ -557,20 +483,13 @@
     load('refresh')
       .then(function () { setStatus('Links re-read from the sheets.'); })
       .catch(function (err) {
-        if (err.auth) return handleAuthFail(err);
+        if (err.auth) return handleAuthFail();
         setStatus('Refresh failed: ' + errText(err), true);
       })
       .then(function () {
         refreshBtn.disabled = false;
         refreshBtn.textContent = 'Refresh';
       });
-  });
-
-  forgetBtn.addEventListener('click', function () {
-    lsDel(LS_KEY);
-    lsDel(LS_ITEMS);
-    forgetBtn.hidden = true;
-    showUnlock('');
   });
 
   // ── Edit mode ───────────────────────────────
@@ -589,7 +508,7 @@
         renderEdit();
       })
       .catch(function (err) {
-        if (err.auth) return handleAuthFail(err);
+        if (err.auth) return handleAuthFail();
         setStatus('Couldn’t open editor: ' + errText(err), true);
       })
       .then(function () {
@@ -691,7 +610,7 @@
         setStatus('Saved.');
       })
       .catch(function (err) {
-        if (err.auth) return handleAuthFail(err);
+        if (err.auth) return handleAuthFail();
         setStatus('Save failed: ' + errText(err), true);
       })
       .then(function () {
@@ -703,8 +622,6 @@
   // ── Start ───────────────────────────────────
   // Show the last-known list instantly, then refresh it in the background.
   (function start() {
-    if (!getKey()) { showUnlock(''); return; }
-    forgetBtn.hidden = false;
     var cached = cachedItems();
     if (cached) {
       render(cached.items);
@@ -715,7 +632,8 @@
     load('list')
       .then(function () { setStatus('Updated ' + timeStr(Date.now())); })
       .catch(function (err) {
-        if (err.auth) return handleAuthFail(err);
+        if (err.auth && cached) return handleAuthFail();
+        if (err.auth) err = new Error('the key in index.html doesn’t match the script — update API_KEY.');
         if (cached) setStatus('Offline — showing list from ' + timeStr(cached.at), true);
         else {
           board.textContent = '';
