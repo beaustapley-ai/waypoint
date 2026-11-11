@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Waypoint</title>
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Waypoint">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#EDF0EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10150F" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground:   #EDF0EC;
+    --surface:  #F8FAF7;
+    --ink:      #1B2420;
+    --muted:    #5C6B63;
+    --line:     #CBD5CD;
+    --line-soft:#DDE4DD;
+    --accent:   #2E6B4F;
+    --marker:   #9A6813;
+    --danger:   #A33A2A;
+    --contour:  rgba(46, 107, 79, .10);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #10150F;
+      --surface:  #18201A;
+      --ink:      #E7EDE6;
+      --muted:    #94A499;
+      --line:     #2C3830;
+      --line-soft:#232E27;
+      --accent:   #7CC79A;
+      --marker:   #DCA84E;
+      --danger:   #E88A78;
+      --contour:  rgba(124, 199, 154, .09);
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    min-height: 100vh;
+  }
+
+  .topo {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      repeating-radial-gradient(circle at 8% 12%, transparent 0 41px, var(--contour) 41px 42px),
+      repeating-radial-gradient(circle at 92% 82%, transparent 0 53px, var(--contour) 53px 54px);
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+    margin: 0 auto;
+    padding-inline: max(20px, env(safe-area-inset-left, 0px));
+    padding-block: 48px 64px;
+  }
+
+  .masthead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px 20px;
+    flex-wrap: wrap;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .wordmark {
+    font-family: Newsreader, Georgia, "Times New Roman", serif;
+    font-weight: 400;
+    font-size: clamp(38px, 9vw, 52px);
+    line-height: 1;
+    letter-spacing: -0.015em;
+    margin: 0;
+  }
+  .wordmark em { font-style: italic; color: var(--accent); }
+  .tagline {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 10px 0 0;
+  }
+  .actions { display: flex; gap: 8px; }
+  .actions[hidden] { display: none; }
+
+  button { font: inherit; cursor: pointer; }
+  .btn {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 9px 14px;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn[disabled] { opacity: .45; cursor: default; }
+  .btn--primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+  .btn--primary:hover { color: var(--surface); opacity: .9; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .board {
+    margin-top: 28px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .row + .row { border-top: 1px solid var(--line-soft); }
+
+  .row {
+    display: grid;
+    grid-template-columns: 92px 1fr auto;
+    align-items: center;
+    gap: 18px;
+    padding: 20px 22px;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color .15s ease;
+  }
+  a.row:hover, a.row:active { background: var(--ground); }
+  a.row:hover .row-go { color: var(--accent); }
+  a.row:hover .arrow { transform: translate(2px, -2px); }
+
+  .tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--marker);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 4px 6px;
+    text-align: center;
+    justify-self: start;
+    max-width: 92px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row-main { min-width: 0; }
+  .row-name {
+    display: block;
+    font-family: Newsreader, Georgia, serif;
+    font-size: 21px;
+    line-height: 1.25;
+  }
+  .row-blurb {
+    display: block;
+    color: var(--muted);
+    font-size: 13.5px;
+    margin-top: 2px;
+  }
+  .row-note {
+    display: block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: .05em;
+    margin-top: 6px;
+    color: var(--marker);
+  }
+  .row-go {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    transition: color .15s ease;
+  }
+  .arrow { display: inline-block; transition: transform .15s ease; }
+  .row--unlinked .row-go { color: var(--marker); }
+  .empty { padding: 28px 22px; color: var(--muted); font-size: 14px; }
+
+  /* ── Unlock ──────────────────────────────── */
+  .unlock { padding: 26px 22px; display: grid; gap: 12px; }
+  .unlock h2 {
+    font-family: Newsreader, Georgia, serif;
+    font-weight: 400;
+    font-size: 22px;
+    margin: 0;
+  }
+  .unlock p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .unlock form { display: flex; gap: 8px; }
+  .unlock input { flex: 1; }
+
+  /* ── Edit mode ───────────────────────────── */
+  .edit {
+    display: grid;
+    grid-template-columns: 92px 1fr auto;
+    gap: 10px 18px;
+    padding: 20px 22px;
+    align-items: start;
+  }
+  .edit + .edit { border-top: 1px solid var(--line-soft); }
+  .edit-fields { display: grid; gap: 8px; min-width: 0; }
+  .field-pair { display: grid; grid-template-columns: 150px 1fr; gap: 8px; }
+  .hint {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: .05em;
+    color: var(--muted);
+    margin: 0;
+  }
+  input, select {
+    font: inherit;
+    font-size: 16px; /* prevents iOS zoom-on-focus */
+    color: var(--ink);
+    background: var(--ground);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 7px 9px;
+    width: 100%;
+    min-width: 0;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input.in-tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 16px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--marker);
+    text-align: center;
+    padding: 6px;
+  }
+  input.in-name { font-family: Newsreader, Georgia, serif; font-size: 19px; padding: 5px 9px; }
+  select, input.in-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 16px; }
+  @media (min-width: 561px) {
+    input.in-tag { font-size: 12px; padding: 8px 6px; }
+    select, input.in-mono { font-size: 13px; }
+  }
+  .tools { display: flex; flex-direction: column; gap: 6px; }
+  .tool {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    width: 36px; height: 34px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    color: var(--muted);
+  }
+  .tool:hover { color: var(--accent); border-color: var(--accent); }
+  .tool[disabled] { opacity: .3; cursor: default; }
+  .tool--del:hover, .tool--armed { color: var(--danger); border-color: var(--danger); }
+  .add-row {
+    display: block;
+    width: 100%;
+    padding: 16px 22px;
+    border: 0;
+    border-top: 1px dashed var(--line);
+    background: transparent;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+  }
+  .board > .add-row:first-child { border-top: 0; }
+  .add-row:hover { color: var(--accent); background: var(--ground); }
+
+  .footer {
+    margin-top: 20px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .status {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin: 0;
+  }
+  .status--bad { color: var(--danger); }
+  .linkish {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .06em;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .linkish:hover { color: var(--accent); }
+  .linkish[hidden] { display: none; }
+
+  @media (max-width: 560px) {
+    .wrap { padding-block: 32px 48px; }
+    .row { grid-template-columns: 1fr auto; gap: 10px 14px; padding: 18px; }
+    .tag { grid-column: 1 / -1; }
+    .edit { grid-template-columns: 1fr auto; padding: 18px; }
+    .edit .in-tag { grid-column: 1 / 2; max-width: 140px; }
+    .edit .tools { grid-row: 1 / 3; grid-column: 2; }
+    .edit-fields { grid-column: 1 / 2; }
+    .field-pair { grid-template-columns: 1fr; }
+    .unlock form { flex-direction: column; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="topo" aria-hidden="true"></div>
+
+<main class="wrap">
+  <header class="masthead">
+    <div>
+      <h1 class="wordmark">Way<em>point</em></h1>
+      <p class="tagline" id="tagline">One door to everything you built</p>
+    </div>
+    <div class="actions" id="viewActions">
+      <button class="btn" id="editBtn">Edit</button>
+      <button class="btn" id="refreshBtn">Refresh</button>
+    </div>
+    <div class="actions" id="editActions" hidden>
+      <button class="btn" id="cancelBtn">Cancel</button>
+      <button class="btn btn--primary" id="saveBtn">Save</button>
+    </div>
+  </header>
+
+  <div class="board" id="board"></div>
+
+  <div class="footer">
+    <p class="status" id="status"></p>
+    <button class="linkish" id="forgetBtn" hidden>Forget key on this device</button>
+  </div>
+</main>
+
+<script>
+  /* ─────────────────────────────────────────────────────────────────────────
+   * CONFIG — paste your Apps Script web-app URL (ends in /exec) here.
+   * It's safe to commit: nothing comes back without the Waypoint key.
+   * ───────────────────────────────────────────────────────────────────────── */
+  var API_URL = 'PASTE_YOUR_APPS_SCRIPT_EXEC_URL';
+
+  var LS_KEY = 'waypoint.key';
+  var LS_ITEMS = 'waypoint.items';
+
+  var board = document.getElementById('board');
+  var statusEl = document.getElementById('status');
+  var tagline = document.getElementById('tagline');
+  var refreshBtn = document.getElementById('refreshBtn');
+  var editBtn = document.getElementById('editBtn');
+  var saveBtn = document.getElementById('saveBtn');
+  var cancelBtn = document.getElementById('cancelBtn');
+  var forgetBtn = document.getElementById('forgetBtn');
+  var viewActions = document.getElementById('viewActions');
+  var editActions = document.getElementById('editActions');
+
+  var DATA = [];
+  var draft = [];
+  var armed = null;
+  var editing = false;
+
+  // ── Storage (wrapped: private mode / storage-off shouldn't break the page) ──
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  function getKey() { return lsGet(LS_KEY) || ''; }
+  function cacheItems(items) { lsSet(LS_ITEMS, JSON.stringify({ at: Date.now(), items: items })); }
+  function cachedItems() {
+    try { var c = JSON.parse(lsGet(LS_ITEMS) || 'null'); return c && Array.isArray(c.items) ? c : null; }
+    catch (e) { return null; }
+  }
+
+  function setStatus(msg, bad) {
+    statusEl.textContent = msg || '';
+    statusEl.className = 'status' + (bad ? ' status--bad' : '');
+  }
+  function errText(err) { return err && err.message ? err.message : String(err); }
+  function timeStr(ms) {
+    return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // ── API ─────────────────────────────────────
+  function AuthError(msg) { this.message = msg; this.auth = true; }
+
+  function api(action, extra, keyOverride) {
+    if (!/^https:\/\//.test(API_URL)) {
+      return Promise.reject(new Error('Set API_URL at the top of index.html to your Apps Script /exec link.'));
+    }
+    var body = Object.assign({ action: action, key: keyOverride != null ? keyOverride : getKey() }, extra || {});
+    return fetch(API_URL, {
+      method: 'POST',
+      // text/plain keeps this a "simple" request, so Apps Script needs no CORS preflight.
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+      redirect: 'follow'
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error('Server replied ' + r.status);
+        return r.text();
+      })
+      .then(function (txt) {
+        var res;
+        try { res = JSON.parse(txt); }
+        catch (e) { throw new Error('Unexpected reply — is the web app deployed with access set to “Anyone”?'); }
+        if (!res.ok) {
+          if (res.code === 'auth') throw new AuthError(res.error || 'Wrong key.');
+          throw new Error(res.error || 'Request failed.');
+        }
+        return res.data;
+      });
+  }
+
+  function handleAuthFail(err) {
+    lsDel(LS_KEY);
+    forgetBtn.hidden = true;
+    showUnlock(err.message);
+  }
+
+  // ── View mode ───────────────────────────────
+  function mk(tag, cls, props) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    Object.keys(props || {}).forEach(function (k) { n[k] = props[k]; });
+    return n;
+  }
+
+  function render(items) {
+    DATA = items;
+    board.textContent = '';
+
+    if (!items.length) {
+      board.appendChild(mk('div', 'empty', { textContent: 'No destinations yet — tap Edit to add one.' }));
+    }
+
+    items.forEach(function (item) {
+      var el = document.createElement(item.url ? 'a' : 'div');
+      el.className = 'row' + (item.url ? '' : ' row--unlinked');
+      if (item.url) {
+        el.href = item.url;
+        el.target = '_blank';
+        el.rel = 'noopener noreferrer';
+      }
+
+      el.appendChild(mk('span', 'tag', { textContent: item.label || '—' }));
+
+      var main = mk('span', 'row-main');
+      main.appendChild(mk('span', 'row-name', { textContent: item.name }));
+      if (item.blurb) main.appendChild(mk('span', 'row-blurb', { textContent: item.blurb }));
+      if (item.note) {
+        main.appendChild(mk('span', 'row-note', {
+          textContent: item.url ? item.note + ' · using the fallback link' : item.note
+        }));
+      }
+      el.appendChild(main);
+
+      var go = mk('span', 'row-go');
+      if (item.url) {
+        go.appendChild(document.createTextNode('Open '));
+        go.appendChild(mk('span', 'arrow', { textContent: '↗' }));
+      } else {
+        go.textContent = 'No link';
+      }
+      el.appendChild(go);
+
+      board.appendChild(el);
+    });
+
+    tagline.textContent = items.length === 1 ? '1 destination' : items.length + ' destinations';
+  }
+
+  function showUnlock(message) {
+    editing = false;
+    viewActions.hidden = true;
+    editActions.hidden = true;
+    board.textContent = '';
+    tagline.textContent = 'Locked on this device';
+
+    var box = mk('div', 'unlock');
+    box.appendChild(mk('h2', '', { textContent: 'Enter your Waypoint key' }));
+    box.appendChild(mk('p', '', { textContent: 'One time per device. It’s the key createKey() printed in the Apps Script log.' }));
+
+    var form = mk('form');
+    var input = mk('input', 'in-mono', { type: 'password', placeholder: 'Waypoint key', autocomplete: 'current-password',
+      ariaLabel: 'Waypoint key', autocapitalize: 'off', spellcheck: false });
+    var btn = mk('button', 'btn btn--primary', { type: 'submit', textContent: 'Unlock' });
+    form.appendChild(input);
+    form.appendChild(btn);
+    form.onsubmit = function (e) {
+      e.preventDefault();
+      var key = input.value.trim();
+      if (!key) return;
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+      setStatus('');
+      api('list', null, key)
+        .then(function (items) {
+          lsSet(LS_KEY, key);
+          forgetBtn.hidden = false;
+          viewActions.hidden = false;
+          cacheItems(items);
+          render(items);
+          setStatus('Unlocked.');
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.textContent = 'Unlock';
+          setStatus(err.auth ? 'That key didn’t match.' : 'Couldn’t reach Waypoint: ' + errText(err), true);
+        });
+    };
+    box.appendChild(form);
+    board.appendChild(box);
+    setStatus(message || '', !!message);
+    setTimeout(function () { input.focus(); }, 50);
+  }
+
+  function load(action) {
+    return api(action).then(function (items) {
+      cacheItems(items);
+      if (!editing) render(items);
+      return items;
+    });
+  }
+
+  refreshBtn.addEventListener('click', function () {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = 'Reading…';
+    setStatus('');
+    load('refresh')
+      .then(function () { setStatus('Links re-read from the sheets.'); })
+      .catch(function (err) {
+        if (err.auth) return handleAuthFail(err);
+        setStatus('Refresh failed: ' + errText(err), true);
+      })
+      .then(function () {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = 'Refresh';
+      });
+  });
+
+  forgetBtn.addEventListener('click', function () {
+    lsDel(LS_KEY);
+    lsDel(LS_ITEMS);
+    forgetBtn.hidden = true;
+    showUnlock('');
+  });
+
+  // ── Edit mode ───────────────────────────────
+  function enterEdit() {
+    editBtn.disabled = true;
+    editBtn.textContent = 'Loading…';
+    setStatus('');
+    api('settings')
+      .then(function (apps) {
+        draft = apps.map(function (a) { return Object.assign({}, a); });
+        editing = true;
+        armed = null;
+        viewActions.hidden = true;
+        editActions.hidden = false;
+        tagline.textContent = 'Editing destinations';
+        renderEdit();
+      })
+      .catch(function (err) {
+        if (err.auth) return handleAuthFail(err);
+        setStatus('Couldn’t open editor: ' + errText(err), true);
+      })
+      .then(function () {
+        editBtn.disabled = false;
+        editBtn.textContent = 'Edit';
+      });
+  }
+
+  function exitEdit(items) {
+    editing = false;
+    viewActions.hidden = false;
+    editActions.hidden = true;
+    armed = null;
+    render(items || DATA);
+  }
+
+  function move(i, d) {
+    var j = i + d;
+    if (j < 0 || j >= draft.length) return;
+    var t = draft[i]; draft[i] = draft[j]; draft[j] = t;
+    renderEdit();
+  }
+
+  function renderEdit() {
+    board.textContent = '';
+
+    draft.forEach(function (a, i) {
+      var row = mk('div', 'edit');
+      function bind(field) { return function (e) { a[field] = e.target.value; }; }
+
+      row.appendChild(mk('input', 'in-tag', { value: a.label || '', placeholder: 'Label', maxLength: 16,
+        ariaLabel: 'Label', oninput: bind('label') }));
+
+      var fields = mk('div', 'edit-fields');
+      fields.appendChild(mk('input', 'in-name', { value: a.name || '', placeholder: 'App name',
+        ariaLabel: 'Name', oninput: bind('name') }));
+      fields.appendChild(mk('input', '', { value: a.blurb || '', placeholder: 'One-line description (optional)',
+        ariaLabel: 'Description', oninput: bind('blurb') }));
+
+      var isSheet = a.type === 'sheet';
+      var pair = mk('div', 'field-pair');
+      var sel = mk('select', '', { ariaLabel: 'Link type', onchange: function (e) { a.type = e.target.value; renderEdit(); } });
+      sel.appendChild(mk('option', '', { value: 'url', textContent: 'Direct link' }));
+      sel.appendChild(mk('option', '', { value: 'sheet', textContent: 'Sheet · App!A1' }));
+      sel.value = isSheet ? 'sheet' : 'url';
+      pair.appendChild(sel);
+      pair.appendChild(mk('input', 'in-mono', { type: 'url', value: a.source || '',
+        placeholder: isSheet ? 'Google Sheet URL or ID' : 'https://…', ariaLabel: 'Link',
+        autocapitalize: 'off', oninput: bind('source') }));
+      fields.appendChild(pair);
+
+      if (isSheet) {
+        fields.appendChild(mk('input', 'in-mono', { type: 'url', value: a.fallback || '',
+          placeholder: 'Fallback link if the sheet can’t be read (optional)', ariaLabel: 'Fallback link',
+          autocapitalize: 'off', oninput: bind('fallback') }));
+      }
+      fields.appendChild(mk('p', 'hint', { textContent: isSheet
+        ? 'Reads the live link from cell A1 of the sheet’s App tab.'
+        : 'Opens this exact link.' }));
+      row.appendChild(fields);
+
+      var tools = mk('div', 'tools');
+      tools.appendChild(mk('button', 'tool', { textContent: '↑', title: 'Move up', ariaLabel: 'Move up',
+        disabled: i === 0, onclick: function () { move(i, -1); } }));
+      tools.appendChild(mk('button', 'tool', { textContent: '↓', title: 'Move down', ariaLabel: 'Move down',
+        disabled: i === draft.length - 1, onclick: function () { move(i, 1); } }));
+      var del = mk('button', 'tool tool--del' + (armed === a ? ' tool--armed' : ''), {
+        textContent: '✕', title: 'Remove', ariaLabel: 'Remove' });
+      del.onclick = function () {
+        if (armed === a) { armed = null; draft.splice(i, 1); setStatus(''); renderEdit(); return; }
+        armed = a;
+        setStatus('Tap ✕ again to remove “' + (a.name || 'this app') + '”.');
+        renderEdit();
+      };
+      tools.appendChild(del);
+      row.appendChild(tools);
+
+      board.appendChild(row);
+    });
+
+    board.appendChild(mk('button', 'add-row', { textContent: '+ Add destination', onclick: function () {
+      draft.push({ name: '', label: '', blurb: '', type: 'url', source: '', fallback: '' });
+      renderEdit();
+      var names = board.querySelectorAll('.in-name');
+      if (names.length) names[names.length - 1].focus();
+    } }));
+  }
+
+  editBtn.addEventListener('click', enterEdit);
+  cancelBtn.addEventListener('click', function () { setStatus(''); exitEdit(); });
+  saveBtn.addEventListener('click', function () {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    setStatus('');
+    api('save', { apps: draft })
+      .then(function (items) {
+        cacheItems(items);
+        exitEdit(items);
+        setStatus('Saved.');
+      })
+      .catch(function (err) {
+        if (err.auth) return handleAuthFail(err);
+        setStatus('Save failed: ' + errText(err), true);
+      })
+      .then(function () {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+      });
+  });
+
+  // ── Start ───────────────────────────────────
+  // Show the last-known list instantly, then refresh it in the background.
+  (function start() {
+    if (!getKey()) { showUnlock(''); return; }
+    forgetBtn.hidden = false;
+    var cached = cachedItems();
+    if (cached) {
+      render(cached.items);
+      setStatus('Updating…');
+    } else {
+      board.appendChild(mk('div', 'empty', { textContent: 'Loading destinations…' }));
+    }
+    load('list')
+      .then(function () { setStatus('Updated ' + timeStr(Date.now())); })
+      .catch(function (err) {
+        if (err.auth) return handleAuthFail(err);
+        if (cached) setStatus('Offline — showing list from ' + timeStr(cached.at), true);
+        else {
+          board.textContent = '';
+          board.appendChild(mk('div', 'empty', { textContent: 'Couldn’t load your destinations. Tap Refresh to try again.' }));
+          setStatus('Couldn’t reach Waypoint: ' + errText(err), true);
+        }
+      });
+  })();
+</script>
+
+</body>
+</html>
